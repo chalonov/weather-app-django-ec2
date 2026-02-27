@@ -1,0 +1,36 @@
+# Dockerfile.cloudrun - Optimizado para Cloud Run
+FROM python:3.11-slim
+
+# Variables de entorno para Cloud Run
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8080
+
+WORKDIR /app
+
+# Instalar dependencias del sistema
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Instalar gunicorn para producción
+RUN pip install gunicorn
+
+# Copiar código
+COPY . .
+
+# Crear directorios necesarios
+RUN mkdir -p staticfiles
+
+# Ejecutar migraciones y collectstatic
+RUN python manage.py migrate --noinput || true
+RUN python manage.py collectstatic --noinput || true
+
+# Exponer puerto (Cloud Run usa 8080)
+EXPOSE 8080
+
+# Comando de inicio con Gunicorn
+CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 8 --timeout 0 weatherApp.wsgi:application
